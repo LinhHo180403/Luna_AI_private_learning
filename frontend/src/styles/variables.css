@@ -1,0 +1,81 @@
+/* frontend/src/styles/variables.css
+ * Token hệ thống thiết kế cho Luna AI - lấy cảm hứng từ chính tên "Luna" (mặt trăng):
+ * nền tối màu đêm (night indigo), điểm nhấn lavender ánh trăng, và cam san hô ấm áp
+ * tượng trưng cho sự thân thiện/ấm áp của Luna giữa "màn đêm" lạnh lẽo của giao diện AI
+ * thông thường. CÓ CHỦ ĐÍCH tránh các mô-típ mặc định (be+terracotta, near-black+neon,
+ * bo góc đồng nhất mọi nơi).
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Fredoka:wght@500;600;700&display=swap');
+
+:root {
+  /* ---- Màu nền & bề mặt (mặc định = light mode "ban ngày dịu") ---- */
+  --luna-bg: #F6F4FB;
+  --luna-surface: #FFFFFF;
+  --luna-surface-raised: #FBFAFF;
+  --luna-border: #E4DFF5;
+
+  /* ---- Màu chữ ---- */
+  --luna-text: #26213D;
+  --luna-text-muted: #6B6489;
+  --luna-text-on-accent: #FFFFFF;
+
+  /* ---- Màu điểm nhấn (giữ nguyên giữa light/dark - đây là "linh hồn" thương hiệu) ---- */
+  --luna-lavender: #9B8AE6;
+  --luna-lavender-strong: #7C69D9;
+  --luna-coral: #FF8B6B;
+  --luna-coral-strong: #F4714E;
+  --luna-mint: #4FCBA0;
+  --luna-mint-strong: #34A87F;
+  --luna-rose: #F26D9B;
+
+  /* ---- Emotion glow (dùng cho AvatarFace) ---- */
+  --luna-emotion-happy: var(--luna-coral);
+  --luna-emotion-shy: var(--luna-rose);
+  --luna-emotion-excited: #FFB648;
+  --luna-emotion-sad: #6B84D6;
+  --luna-emotion-curious: var(--luna-lavender);
+  --luna-emotion-neutral: #A79FC7;
+
+  /* ---- Typography ---- */
+  --luna-font-body: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --luna-font-display: 'Fredoka', var(--luna-font-body);
+
+  --luna-text-xs: 0.75rem;
+  --luna-text-sm: 0.875rem;
+  --luna-text-base: 1rem;
+  --luna-text-lg: 1.125rem;
+  --luna-text-xl: 1.375rem;
+  --luna-text-2xl: 1.75rem;
+
+  /* ---- Khoảng cách (thang 4px) ---- */
+  --luna-space-1: 4px;
+  --luna-space-2: 8px;
+  --luna-space-3: 12px;
+  --luna-space-4: 16px;
+  --luna-space-5: 24px;
+  --luna-space-6: 32px;
+  --luna-space-8: 48px;
+
+  /* ---- Bo góc: CÓ CHỦ ĐÍCH khác nhau theo loại thành phần, không đồng nhất ----
+   * Bubble chat: rất bo tròn (giống app nhắn tin). Card: bo vừa. Ô lưới game: sắc
+   * cạnh (ưu tiên dễ đọc lưới hơn là "dễ thương"). */
+  --luna-radius-bubble: 20px;
+  --luna-radius-card: 14px;
+  --luna-radius-control: 10px;
+  --luna-radius-pill: 999px;
+  --luna-radius-grid-cell: 3px;
+
+  /* ---- Bóng đổ: ấm, mềm, KHÔNG dùng rgba(0,0,0,.1) xám mặc định cho mọi nơi ---- */
+  --luna-shadow-card: 0 8px 24px -8px rgba(124, 105, 217, 0.28);
+  --luna-shadow-bubble: 0 2px 8px -2px rgba(38, 33, 61, 0.12);
+  --luna-shadow-float: 0 16px 40px -12px rgba(38, 33, 61, 0.35);
+
+  /* ---- Chuyển động ---- */
+  --luna-transition-fast: 120ms ease;
+  --luna-transition-normal: 220ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ---- Z-index scale ---- */
+  --luna-z-overlay: 100;
+  --luna-z-modal: 200;
+}

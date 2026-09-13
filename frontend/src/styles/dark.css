@@ -1,0 +1,45 @@
+/* frontend/src/styles/dark.css
+ * Dark mode = "đêm trăng thật sự" - đúng tinh thần tên Luna. Toggle bằng thuộc tính
+ * [data-theme="dark"] trên thẻ <html> (App.jsx set/đọc từ localStorage). Điểm nhấn
+ * lavender/coral/mint GIỮ NGUYÊN giữa 2 theme (đây là bản sắc thương hiệu cố định),
+ * chỉ nền/bề mặt/chữ đổi.
+ */
+
+[data-theme='dark'] {
+  --luna-bg: #14122A;
+  --luna-surface: #1E1B3A;
+  --luna-surface-raised: #252044;
+  --luna-border: #362F5C;
+
+  --luna-text: #ECE8F9;
+  --luna-text-muted: #A79FC7;
+
+  --luna-shadow-card: 0 8px 24px -8px rgba(0, 0, 0, 0.55);
+  --luna-shadow-bubble: 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  --luna-shadow-float: 0 16px 40px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* ---- Một vài điều chỉnh riêng biệt không chỉ đơn thuần đổi biến màu ---- */
+
+[data-theme='dark'] .avatar-face-circle {
+  background: radial-gradient(circle at 35% 30%, #2C2650, #1A1732);
+}
+
+[data-theme='dark'] .snake-game-grid {
+  background: #0F0D22;
+}
+
+[data-theme='dark'] .tictactoe-board {
+  background: var(--luna-border);
+}
+
+/* Logo/hoạ tiết "sao trời" nhẹ phía sau header khi ở dark mode - điểm nhấn tinh tế,
+ * chỉ 1 hiệu ứng duy nhất, không lạm dụng trang trí. */
+[data-theme='dark'] .app-header {
+  background:
+    radial-gradient(1px 1px at 12% 40%, rgba(236, 232, 249, 0.5), transparent),
+    radial-gradient(1px 1px at 32% 70%, rgba(236, 232, 249, 0.35), transparent),
+    radial-gradient(1.5px 1.5px at 68% 30%, rgba(236, 232, 249, 0.4), transparent),
+    radial-gradient(1px 1px at 85% 60%, rgba(236, 232, 249, 0.3), transparent),
+    var(--luna-surface);
+}

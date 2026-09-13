@@ -1,0 +1,12 @@
+const CommandTypes = Object.freeze({
+  OPEN_GAME: 'OPEN_GAME',
+  CLOSE_GAME: 'CLOSE_GAME',
+  CHANGE_EMOTION: 'CHANGE_EMOTION',
+  CHANGE_ANIMATION: 'CHANGE_ANIMATION',
+  SPEAK: 'SPEAK',
+  UPDATE_MEMORY: 'UPDATE_MEMORY',
+  SHOW_PLAN: 'SHOW_PLAN',
+  CLEAR_CHAT: 'CLEAR_CHAT',
+});
+
+module.exports = CommandTypes;

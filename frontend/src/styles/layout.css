@@ -1,0 +1,530 @@
+/* frontend/src/styles/layout.css
+ * Bố cục tổng thể của app + các thành phần cấp "layout" (không phải chat bubble hay
+ * avatar - 2 thứ đó có file riêng): header, khung chat, PlanCard, ErrorBoundary,
+ * overlay game (Snake/TicTacToe), và các control dùng chung (button, input, select).
+ *
+ * Ý tưởng bố cục: panel avatar cố định bên trái (như một "cửa sổ nhìn ra" Luna),
+ * khung chat chiếm phần còn lại - giống model 1 nhân vật đồng hành cố định, không
+ * phải kiểu chat toàn màn hình chung chung.
+ */
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+
+.app-shell {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: var(--luna-bg);
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--luna-space-3) var(--luna-space-5);
+  border-bottom: 1px solid var(--luna-border);
+  background: var(--luna-surface);
+}
+
+.app-header-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--luna-space-2);
+  font-family: var(--luna-font-display);
+  font-size: var(--luna-text-lg);
+  font-weight: 600;
+  color: var(--luna-text);
+}
+
+.app-header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--luna-space-2);
+}
+
+.app-body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr) 0;
+  min-height: 0;
+  transition: grid-template-columns var(--luna-transition-normal);
+}
+
+.app-body-game-open {
+  grid-template-columns: 280px minmax(0, 1fr) minmax(320px, 420px);
+}
+
+.avatar-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--luna-space-4);
+  padding: var(--luna-space-6) var(--luna-space-4);
+  border-right: 1px solid var(--luna-border);
+  background: var(--luna-surface);
+}
+
+.avatar-panel-status {
+  font-size: var(--luna-text-sm);
+  color: var(--luna-text-muted);
+  text-align: center;
+}
+
+.avatar-panel-name {
+  font-family: var(--luna-font-display);
+  font-size: var(--luna-text-xl);
+  font-weight: 600;
+  color: var(--luna-text);
+}
+
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+}
+
+/* Khi đóng, cột phải có chiều rộng 0; chat vẫn ở cột trung tâm. */
+.game-sidebar {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--luna-surface);
+  border-left: 0 solid var(--luna-border);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(20px);
+  transition: opacity var(--luna-transition-normal), transform var(--luna-transition-normal), border-color var(--luna-transition-normal);
+}
+
+.app-body-game-open .game-sidebar {
+  border-left-width: 1px;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.game-sidebar-content { height: 100%; min-width: 320px; overflow-y: auto; padding: var(--luna-space-5); }
+.snake-canvas-game { display: flex; flex-direction: column; gap: var(--luna-space-3); }
+.snake-canvas-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--luna-space-3); }
+.snake-canvas-header h2 { margin: 0 0 var(--luna-space-1); font-size: var(--luna-text-xl); }
+.snake-canvas-header span, .snake-canvas-help { color: var(--luna-text-muted); font-size: var(--luna-text-sm); }
+.snake-canvas-help, .snake-canvas-result { margin: 0; }
+.snake-canvas-result { color: var(--luna-coral-strong); font-weight: 600; }
+
+.game-sidebar-close {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--luna-radius-pill);
+  color: var(--luna-text-muted); font-size: 1.5rem; line-height: 1;
+}
+.game-sidebar-close:hover { background: var(--luna-bg); color: var(--luna-coral-strong); }
+.snake-canvas { width: 100%; max-width: 360px; align-self: center; aspect-ratio: 1; border: 1px solid var(--luna-border); border-radius: var(--luna-radius-control); }
+.snake-canvas-actions { display: flex; gap: var(--luna-space-2); }
+.snake-canvas-actions button { background: var(--luna-lavender-strong); color: var(--luna-text-on-accent); border-radius: var(--luna-radius-pill); padding: var(--luna-space-2) var(--luna-space-4); font-weight: 600; }
+.snake-canvas-actions button + button { background: var(--luna-coral-strong); }
+
+.chat-message-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--luna-space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--luna-space-3);
+}
+
+.chat-empty-state {
+  margin: auto;
+  text-align: center;
+  color: var(--luna-text-muted);
+  max-width: 32ch;
+}
+
+.chat-input-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--luna-space-2);
+  padding: var(--luna-space-4) var(--luna-space-5);
+  border-top: 1px solid var(--luna-border);
+  background: var(--luna-surface);
+}
+
+.chat-input-field {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--luna-border);
+  border-radius: var(--luna-radius-control);
+  padding: var(--luna-space-3) var(--luna-space-4);
+  background: var(--luna-bg);
+  color: var(--luna-text);
+  line-height: 1.4;
+  max-height: 120px;
+}
+
+.chat-input-field:focus {
+  border-color: var(--luna-lavender);
+}
+
+/* ============================================================
+   BUTTONS & CONTROLS (dùng chung toàn app)
+   ============================================================ */
+
+.btn-primary {
+  background: var(--luna-lavender-strong);
+  color: var(--luna-text-on-accent);
+  padding: var(--luna-space-3) var(--luna-space-5);
+  border-radius: var(--luna-radius-pill);
+  font-weight: 600;
+  transition: background var(--luna-transition-fast), transform var(--luna-transition-fast);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--luna-coral-strong);
+  transform: translateY(-1px);
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--luna-radius-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--luna-text-muted);
+  transition: background var(--luna-transition-fast), color var(--luna-transition-fast);
+}
+
+.btn-icon:hover {
+  background: var(--luna-bg);
+  color: var(--luna-lavender-strong);
+}
+
+select,
+.snake-game-speed-select {
+  border: 1px solid var(--luna-border);
+  border-radius: var(--luna-radius-control);
+  padding: var(--luna-space-2) var(--luna-space-3);
+  background: var(--luna-surface);
+}
+
+/* ============================================================
+   PLAN CARD
+   ============================================================ */
+
+.plan-card {
+  background: var(--luna-surface-raised);
+  border: 1px solid var(--luna-border);
+  border-radius: var(--luna-radius-card);
+  padding: var(--luna-space-5);
+  box-shadow: var(--luna-shadow-card);
+  max-width: 480px;
+  position: relative;
+}
+
+.plan-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--luna-space-3);
+  margin-bottom: var(--luna-space-4);
+}
+
+.plan-card-title {
+  margin: 0;
+  font-size: var(--luna-text-lg);
+}
+
+.plan-card-close-btn {
+  color: var(--luna-text-muted);
+  font-size: var(--luna-text-base);
+  line-height: 1;
+  padding: var(--luna-space-1);
+}
+
+.plan-card-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--luna-space-3);
+  margin-bottom: var(--luna-space-4);
+}
+
+.plan-card-progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--luna-radius-pill);
+  background: var(--luna-border);
+  overflow: hidden;
+}
+
+.plan-card-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--luna-lavender), var(--luna-coral));
+  transition: width var(--luna-transition-normal);
+}
+
+.plan-card-progress-label {
+  font-size: var(--luna-text-xs);
+  color: var(--luna-text-muted);
+  white-space: nowrap;
+}
+
+.plan-card-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--luna-space-3);
+  margin-bottom: var(--luna-space-4);
+}
+
+.plan-card-step {
+  padding: var(--luna-space-3);
+  border-radius: var(--luna-radius-control);
+  background: var(--luna-surface);
+  border: 1px solid var(--luna-border);
+}
+
+.plan-card-step-done {
+  opacity: 0.6;
+}
+
+.plan-card-step-done .plan-card-step-title {
+  text-decoration: line-through;
+}
+
+.plan-card-step-label {
+  display: flex;
+  align-items: center;
+  gap: var(--luna-space-2);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.plan-card-step-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--luna-lavender-strong);
+}
+
+.plan-card-step-detail {
+  margin: var(--luna-space-2) 0 0 26px;
+  font-size: var(--luna-text-sm);
+  color: var(--luna-text-muted);
+}
+
+.plan-card-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--luna-space-2);
+  font-size: var(--luna-text-sm);
+  color: var(--luna-text-muted);
+}
+
+.plan-card-badge {
+  position: absolute;
+  top: var(--luna-space-3);
+  right: var(--luna-space-3);
+  font-size: var(--luna-text-xs);
+  padding: 2px var(--luna-space-2);
+  border-radius: var(--luna-radius-pill);
+  background: var(--luna-border);
+  color: var(--luna-text-muted);
+}
+
+/* ============================================================
+   ERROR BOUNDARY FALLBACK
+   ============================================================ */
+
+.error-boundary-fallback {
+  margin: var(--luna-space-6) auto;
+  max-width: 420px;
+  text-align: center;
+  padding: var(--luna-space-6);
+  background: var(--luna-surface);
+  border: 1px solid var(--luna-border);
+  border-radius: var(--luna-radius-card);
+}
+
+.error-boundary-details {
+  text-align: left;
+  font-size: var(--luna-text-xs);
+  background: var(--luna-bg);
+  padding: var(--luna-space-3);
+  border-radius: var(--luna-radius-control);
+  overflow-x: auto;
+  color: var(--luna-text-muted);
+}
+
+.error-boundary-retry-btn {
+  margin-top: var(--luna-space-4);
+  background: var(--luna-lavender-strong);
+  color: var(--luna-text-on-accent);
+  padding: var(--luna-space-2) var(--luna-space-5);
+  border-radius: var(--luna-radius-pill);
+  font-weight: 600;
+}
+
+/* ============================================================
+   GAME OVERLAY (wrapper chung cho Snake + TicTacToe)
+   ============================================================ */
+
+.snake-game,
+.tictactoe-game {
+  background: var(--luna-surface-raised);
+  border: 1px solid var(--luna-border);
+  border-radius: var(--luna-radius-card);
+  padding: var(--luna-space-5);
+  box-shadow: var(--luna-shadow-float);
+  max-width: 560px;
+}
+
+.snake-game-header,
+.tictactoe-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--luna-space-4);
+}
+
+.snake-game-close-btn,
+.tictactoe-close-btn {
+  color: var(--luna-text-muted);
+  font-size: var(--luna-text-base);
+  padding: var(--luna-space-1);
+}
+
+.snake-game-controls,
+.tictactoe-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--luna-space-2);
+  margin-bottom: var(--luna-space-3);
+  flex-wrap: wrap;
+}
+
+.snake-game-mode-toggle,
+.tictactoe-mode-toggle {
+  display: flex;
+  border: 1px solid var(--luna-border);
+  border-radius: var(--luna-radius-pill);
+  overflow: hidden;
+}
+
+.snake-game-mode-toggle button,
+.tictactoe-mode-toggle button {
+  padding: var(--luna-space-2) var(--luna-space-4);
+  font-size: var(--luna-text-sm);
+  color: var(--luna-text-muted);
+}
+
+.snake-game-mode-toggle button.active,
+.tictactoe-mode-toggle button.active {
+  background: var(--luna-lavender-strong);
+  color: var(--luna-text-on-accent);
+}
+
+.snake-game-score {
+  font-family: var(--luna-font-display);
+  font-size: var(--luna-text-lg);
+  font-weight: 600;
+  margin-bottom: var(--luna-space-2);
+  color: var(--luna-coral-strong);
+}
+
+.snake-game-commentary {
+  font-size: var(--luna-text-sm);
+  color: var(--luna-text-muted);
+  margin-bottom: var(--luna-space-3);
+  min-height: 1.4em;
+}
+
+.snake-game-commentary-en {
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.snake-game-grid {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--luna-bg);
+  border: 1px solid var(--luna-border);
+  border-radius: var(--luna-radius-control);
+  overflow: hidden;
+  position: relative;
+}
+
+.snake-game-head,
+.snake-game-body,
+.snake-game-food {
+  border-radius: var(--luna-radius-grid-cell);
+  margin: 1px;
+}
+
+.snake-game-head {
+  background: var(--luna-lavender-strong);
+}
+
+.snake-game-body {
+  background: var(--luna-lavender);
+}
+
+.snake-game-food {
+  background: var(--luna-coral);
+  border-radius: 50%;
+}
+
+.snake-game-over {
+  margin-top: var(--luna-space-4);
+  text-align: center;
+}
+
+.snake-game-over button {
+  margin-top: var(--luna-space-2);
+  background: var(--luna-coral-strong);
+  color: var(--luna-text-on-accent);
+  padding: var(--luna-space-2) var(--luna-space-5);
+  border-radius: var(--luna-radius-pill);
+  font-weight: 600;
+}
+
+/* ---- TicTacToe board ---- */
+
+.tictactoe-status {
+  font-size: var(--luna-text-sm);
+  color: var(--luna-text-muted);
+  margin-bottom: var(--luna-space-3);
+  min-height: 1.4em;
+}
+
+.tictactoe-board {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  gap: 2px;
+  background: var(--luna-border);
+  border: 1px solid var(--luna-border);
+  border-radius: var(--luna-radius-control);
+  overflow: hidden;
+}
+
+.tictactoe-cell {
+  background: var(--luna-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--luna-font-display);
+  font-weight: 600;
+  color: var(--luna-lavender-strong);
+  transition: background var(--luna-transition-fast);
+}
+
+.tictactoe-board-classic .tictactoe-cell {
+  font-size: var(--luna-text-2xl);
+}
+
+.tictactoe-board-gomoku .tictactoe-cell {
+  font-size: var(--luna-text-xs);
+}
+
+.tictactoe-cell:hover:not(:disabled) {
+  background: var(--luna-bg);
+}
+
+.tictactoe-cell-last {
+  background: color-mix(in srgb, var(--luna-coral) 18%, var(--luna-surface));
+}

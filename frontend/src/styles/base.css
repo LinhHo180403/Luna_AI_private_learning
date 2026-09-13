@@ -1,0 +1,120 @@
+/* frontend/src/styles/base.css
+ * Reset cơ bản + kiểu chữ mặc định. Áp dụng var() từ variables.css - file này PHẢI
+ * được import SAU variables.css (xem thứ tự import trong main.jsx).
+ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--luna-font-body);
+  font-size: var(--luna-text-base);
+  line-height: 1.55;
+  color: var(--luna-text);
+  background: var(--luna-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background var(--luna-transition-normal), color var(--luna-transition-normal);
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--luna-font-display);
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 var(--luna-space-3);
+  color: var(--luna-text);
+}
+
+h3 { font-size: var(--luna-text-lg); }
+
+p {
+  margin: 0 0 var(--luna-space-3);
+  max-width: 65ch;
+}
+
+button {
+  font-family: inherit;
+  font-size: var(--luna-text-sm);
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+input, select {
+  font-family: inherit;
+  font-size: var(--luna-text-sm);
+  color: var(--luna-text);
+}
+
+ol, ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+img, svg {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: var(--luna-lavender-strong);
+}
+
+/* ---- Focus visible: rõ ràng, dùng màu thương hiệu thay vì outline mặc định xanh ---- */
+:focus-visible {
+  outline: 2px solid var(--luna-lavender-strong);
+  outline-offset: 2px;
+  border-radius: var(--luna-radius-control);
+}
+
+/* ---- Tôn trọng "prefers-reduced-motion" ---- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- Thanh cuộn - tinh chỉnh nhẹ theo tông màu thương hiệu (Webkit) ---- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--luna-border);
+  border-radius: var(--luna-radius-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--luna-lavender);
+}
+
+/* ---- Utility: ẩn về mặt hình ảnh nhưng vẫn đọc được bởi screen reader ---- */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}

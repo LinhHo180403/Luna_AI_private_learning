@@ -1,0 +1,10 @@
+const EventTypes = Object.freeze({
+  USER_MESSAGE: 'USER_MESSAGE',
+  AI_REPLY: 'AI_REPLY',
+  MEMORY_UPDATED: 'MEMORY_UPDATED',
+  SKILL_HANDLED: 'SKILL_HANDLED',
+  ERROR: 'ERROR',
+  SESSION_RESET: 'SESSION_RESET',
+});
+
+module.exports = EventTypes;

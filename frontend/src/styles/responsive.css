@@ -1,0 +1,91 @@
+/* frontend/src/styles/responsive.css
+ * Breakpoint chính: 768px (tablet trở xuống = mobile layout). Trên mobile: panel
+ * avatar thu gọn thành 1 thanh ngang nhỏ phía trên thay vì sidebar dọc, vì màn hình
+ * hẹp không đủ chỗ cho bố cục 2 cột.
+ */
+
+@media (max-width: 768px) {
+  .app-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .app-body-game-open {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .game-sidebar {
+    transform: translateY(16px);
+    border-left: none;
+    border-top: 0 solid var(--luna-border);
+  }
+
+  .app-body-game-open .game-sidebar {
+    border-top-width: 1px;
+    transform: translateY(0);
+  }
+
+  .game-sidebar-content { height: auto; min-width: 0; padding: var(--luna-space-4); }
+
+  .avatar-panel {
+    flex-direction: row;
+    justify-content: flex-start;
+    padding: var(--luna-space-3) var(--luna-space-4);
+    border-right: none;
+    border-bottom: 1px solid var(--luna-border);
+    gap: var(--luna-space-3);
+  }
+
+  .avatar-face-circle {
+    width: 56px;
+    height: 56px;
+  }
+
+  .avatar-face-emoji {
+    font-size: 1.5rem;
+  }
+
+  .avatar-panel-name {
+    font-size: var(--luna-text-base);
+  }
+
+  .avatar-panel-status {
+    text-align: left;
+  }
+
+  .chat-message {
+    max-width: 86%;
+  }
+
+  .app-header {
+    padding: var(--luna-space-2) var(--luna-space-3);
+  }
+
+  .app-header-brand {
+    font-size: var(--luna-text-base);
+  }
+
+  .chat-input-bar {
+    padding: var(--luna-space-3);
+  }
+
+  .snake-game,
+  .tictactoe-game,
+  .plan-card {
+    max-width: 100%;
+    padding: var(--luna-space-4);
+  }
+
+  .tictactoe-board-gomoku .tictactoe-cell {
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 420px) {
+  .snake-game-mode-toggle button,
+  .tictactoe-mode-toggle button {
+    padding: var(--luna-space-2) var(--luna-space-3);
+    font-size: var(--luna-text-xs);
+  }
+}

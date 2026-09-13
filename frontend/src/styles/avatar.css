@@ -1,0 +1,80 @@
+/* frontend/src/styles/avatar.css
+ * Style riêng cho AvatarFace.jsx. Mỗi emotion có 1 màu "glow" riêng (ánh sáng toả
+ * quanh vòng tròn avatar) thay vì chỉ đổi icon - tạo cảm giác Luna "phản ứng" bằng
+ * cả không khí xung quanh, không chỉ khuôn mặt. Animation là avatar TĨNH + CSS
+ * transform (đúng hiện trạng dự án - chưa có Live2D).
+ */
+
+.avatar-face {
+  --avatar-glow: var(--luna-emotion-neutral);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.avatar-face-circle {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 30%, var(--luna-surface-raised), var(--luna-surface));
+  border: 3px solid var(--avatar-glow);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--avatar-glow) 18%, transparent),
+              0 12px 28px -10px color-mix(in srgb, var(--avatar-glow) 55%, transparent);
+  transition: border-color var(--luna-transition-normal), box-shadow var(--luna-transition-normal);
+}
+
+.avatar-face-emoji {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+/* ---- Ánh sáng theo emotion (glow color) ---- */
+.avatar-emotion-happy    { --avatar-glow: var(--luna-emotion-happy); }
+.avatar-emotion-shy      { --avatar-glow: var(--luna-emotion-shy); }
+.avatar-emotion-excited  { --avatar-glow: var(--luna-emotion-excited); }
+.avatar-emotion-sad      { --avatar-glow: var(--luna-emotion-sad); }
+.avatar-emotion-curious  { --avatar-glow: var(--luna-emotion-curious); }
+.avatar-emotion-neutral  { --avatar-glow: var(--luna-emotion-neutral); }
+
+/* ---- Animation theo trạng thái (idle/talk/thinking/wave) ---- */
+
+.avatar-animation-idle .avatar-face-circle {
+  animation: luna-breathe 3.2s ease-in-out infinite;
+}
+
+.avatar-animation-talk .avatar-face-circle {
+  animation: luna-talk-bounce 0.42s ease-in-out infinite;
+}
+
+.avatar-animation-thinking .avatar-face-circle {
+  animation: luna-tilt 1.8s ease-in-out infinite;
+}
+
+.avatar-animation-wave .avatar-face-circle {
+  animation: luna-wave-pulse 0.6s ease-in-out 2;
+}
+
+@keyframes luna-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes luna-talk-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-2px) scale(1.015); }
+}
+
+@keyframes luna-tilt {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+
+@keyframes luna-wave-pulse {
+  0%, 100% { transform: scale(1); }
+  30% { transform: scale(1.08); }
+  60% { transform: scale(0.98); }
+}
