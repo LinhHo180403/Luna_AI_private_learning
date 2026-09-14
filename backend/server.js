@@ -9,15 +9,41 @@ const { readMemory, resetMemory } = require('./memory/memoryManager');
 
 config.validateConfig();
 
+const MAX_MESSAGE_LENGTH = 2000;
+const MAX_SESSION_ID_LENGTH = 128;
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]+$/;
+
+function getValidatedSessionId(sessionId, fallbackToDefault = true) {
+  if (sessionId === undefined || sessionId === null || sessionId === '') {
+    return fallbackToDefault ? 'default' : null;
+  }
+  if (
+    typeof sessionId !== 'string' ||
+    !sessionId.trim() ||
+    sessionId.length > MAX_SESSION_ID_LENGTH ||
+    !SESSION_ID_PATTERN.test(sessionId)
+  ) {
+    return null;
+  }
+  return sessionId;
+}
+
 const app = express();
 app.use(cors({ origin: config.CORS_ORIGIN }));
 app.use(express.json());
 
+app.use((err, req, res, next) => {
+  if (err?.type === 'entity.parse.failed' || err instanceof SyntaxError) {
+    return res.status(400).json({ error: 'JSON request body không hợp lệ.' });
+  }
+  return next(err);
+});
+
 if (config.DEBUG_LOG) {
-  eventBus.on(EventTypes.USER_MESSAGE, (e) => console.log('[event] USER_MESSAGE:', e.message));
+  eventBus.on(EventTypes.USER_MESSAGE, (e) => console.log('[event] USER_MESSAGE:', { length: e.message?.length || 0 }));
   eventBus.on(EventTypes.SKILL_HANDLED, (e) => console.log('[event] SKILL_HANDLED:', e.skill));
   eventBus.on(EventTypes.AI_REPLY, () => console.log('[event] AI_REPLY'));
-  eventBus.on(EventTypes.MEMORY_UPDATED, (e) => console.log('[event] MEMORY_UPDATED:', e));
+  eventBus.on(EventTypes.MEMORY_UPDATED, () => console.log('[event] MEMORY_UPDATED'));
   eventBus.on(EventTypes.ERROR, (e) => console.log('[event] ERROR:', e));
 }
 
@@ -31,8 +57,17 @@ app.post('/api/chat', async (req, res) => {
     if (typeof message !== 'string') {
       return res.status(400).json({ error: 'Thiếu hoặc sai định dạng field "message" (phải là string).' });
     }
+    if (!message.trim()) {
+      return res.status(400).json({ error: 'Field "message" không được để trống.' });
+    }
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return res.status(400).json({ error: `Field "message" không được vượt quá ${MAX_MESSAGE_LENGTH} ký tự.` });
+    }
 
-    const sid = sessionId || 'default';
+    const sid = getValidatedSessionId(sessionId);
+    if (!sid) {
+      return res.status(400).json({ error: 'Field "sessionId" không hợp lệ.' });
+    }
     const session = sessionManager.getSession(sid);
     const response = await lunaBrain.processMessage({ message, session });
 
@@ -61,13 +96,24 @@ app.post('/api/memory/reset', (req, res) => {
 });
 
 app.post('/api/session/:sessionId/reset', (req, res) => {
-  const reset = sessionManager.resetSession(req.params.sessionId);
-  eventBus.emit(EventTypes.SESSION_RESET, { sessionId: req.params.sessionId });
+  const sessionId = getValidatedSessionId(req.params.sessionId, false);
+  if (!sessionId) {
+    return res.status(400).json({ error: 'Session ID không hợp lệ.' });
+  }
+  const reset = sessionManager.resetSession(sessionId);
+  eventBus.emit(EventTypes.SESSION_RESET, { sessionId });
   res.json(reset);
 });
 
 app.use((req, res) => {
   res.status(404).json({ error: `Không tìm thấy route: ${req.method} ${req.path}` });
+});
+
+app.use((err, req, res, next) => {
+  console.error('[server] Unhandled request error:', err.message);
+  const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 500 ? err.status : 500;
+  const error = status === 400 ? 'Yêu cầu không hợp lệ.' : 'Lỗi máy chủ nội bộ, thử lại sau.';
+  res.status(status).json({ error });
 });
 
 if (require.main === module) {
@@ -77,3 +123,5 @@ if (require.main === module) {
 }
 
 module.exports = app;
+module.exports.MAX_MESSAGE_LENGTH = MAX_MESSAGE_LENGTH;
+module.exports.MAX_SESSION_ID_LENGTH = MAX_SESSION_ID_LENGTH;
