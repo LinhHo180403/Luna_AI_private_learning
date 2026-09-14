@@ -1,4 +1,5 @@
 const offlineService = require('../offlineService');
+const { normalizeProviderResponse } = require('./providerResponse');
 
 class OfflineProvider {
   constructor({ generateOfflineReply = offlineService.generateOfflineReply } = {}) {
@@ -11,7 +12,7 @@ class OfflineProvider {
       throw new TypeError('OfflineProvider.chat: "messages" phải là một mảng.');
     }
     const result = await this.generateOfflineReply(context);
-    return { ...result, source: 'offline' };
+    return normalizeProviderResponse(result, this.name);
   }
 }
 

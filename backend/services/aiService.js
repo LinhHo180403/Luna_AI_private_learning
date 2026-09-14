@@ -2,6 +2,7 @@ const config = require('../config/config');
 const naraService = require('./naraService');
 const { LUNA_SYSTEM_PROMPT } = require('../prompts/lunaPrompt');
 const { getConfiguredProvider } = require('./providers/providerRegistry');
+const { normalizeProviderResponse } = require('./providers/providerResponse');
 
 class AiServiceError extends Error {
   constructor(message, cause) {
@@ -11,14 +12,14 @@ class AiServiceError extends Error {
   }
 }
 
-async function getReply(context) {
+async function getReply(context, { provider = getConfiguredProvider() } = {}) {
   const history = (context.session && context.session.history) || [];
   const messages = [
     ...history.map((h) => ({ role: h.role, content: h.content })),
     { role: 'user', content: context.message },
   ];
-  const provider = getConfiguredProvider();
-  return provider.chat(messages, { systemPrompt: LUNA_SYSTEM_PROMPT, context });
+  const response = await provider.chat(messages, { systemPrompt: LUNA_SYSTEM_PROMPT, context });
+  return normalizeProviderResponse(response, provider.name);
 }
 
 async function generateStructured({ system, user }) {

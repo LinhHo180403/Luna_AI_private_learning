@@ -1,4 +1,5 @@
 const naraService = require('../naraService');
+const { normalizeProviderResponse } = require('./providerResponse');
 
 class NaraProviderError extends Error {
   constructor(message, cause) {
@@ -20,7 +21,7 @@ class NaraProvider {
     }
     try {
       const reply = await this.callNara({ messages, systemPrompt });
-      return { reply, emotion: 'neutral', animation: 'talk', source: 'nara' };
+      return normalizeProviderResponse({ reply, emotion: 'neutral', animation: 'talk' }, this.name);
     } catch (err) {
       throw new NaraProviderError(
         'Nara provider request failed. Check provider configuration and service availability.',
