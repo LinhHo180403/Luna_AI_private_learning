@@ -1,5 +1,13 @@
 const naraService = require('../naraService');
 
+class NaraProviderError extends Error {
+  constructor(message, cause) {
+    super(message);
+    this.name = 'NaraProviderError';
+    this.cause = cause;
+  }
+}
+
 class NaraProvider {
   constructor({ callNara = naraService.callNara } = {}) {
     this.name = 'nara';
@@ -10,9 +18,17 @@ class NaraProvider {
     if (!Array.isArray(messages) || messages.length === 0) {
       throw new TypeError('NaraProvider.chat: "messages" phải là mảng không rỗng.');
     }
-    const reply = await this.callNara({ messages, systemPrompt });
-    return { reply, emotion: 'neutral', animation: 'talk', source: 'nara' };
+    try {
+      const reply = await this.callNara({ messages, systemPrompt });
+      return { reply, emotion: 'neutral', animation: 'talk', source: 'nara' };
+    } catch (err) {
+      throw new NaraProviderError(
+        'Nara provider request failed. Check provider configuration and service availability.',
+        err
+      );
+    }
   }
 }
 
 module.exports = NaraProvider;
+module.exports.NaraProviderError = NaraProviderError;

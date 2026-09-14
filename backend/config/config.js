@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const VALID_PROVIDERS = ['offline', 'nara', 'openai', 'gemini'];
+const VALID_PROVIDERS = ['offline', 'nara'];
 
 function parseBoolean(value, defaultValue) {
   if (value === undefined || value === null || value === '') return defaultValue;
@@ -12,8 +12,11 @@ function parseIntSafe(value, defaultValue) {
   return Number.isNaN(parsed) ? defaultValue : parsed;
 }
 
-const rawProvider = (process.env.AI_PROVIDER || 'offline').trim().toLowerCase();
-const AI_PROVIDER = VALID_PROVIDERS.includes(rawProvider) ? rawProvider : 'offline';
+function getAiProviderFromEnv(env = process.env) {
+  return (env.AI_PROVIDER || 'offline').trim().toLowerCase() || 'offline';
+}
+
+const AI_PROVIDER = getAiProviderFromEnv();
 
 const config = {
   PORT: parseIntSafe(process.env.PORT, 3001),
@@ -38,10 +41,10 @@ function validateConfig() {
       'Hãy điền AI_API_KEY hoặc đổi AI_PROVIDER=offline.'
     );
   }
-  if ((config.AI_PROVIDER === 'openai' || config.AI_PROVIDER === 'gemini')) {
+  if (!VALID_PROVIDERS.includes(config.AI_PROVIDER)) {
     warnings.push(
-      `[config] AI_PROVIDER=${config.AI_PROVIDER} hiện chưa được implement (chỉ có switch case), ` +
-      'sẽ rơi về offline hoặc lỗi tuỳ vào aiService.'
+      `[config] AI_PROVIDER=${config.AI_PROVIDER} không được hỗ trợ. ` +
+      `Giá trị hợp lệ: ${VALID_PROVIDERS.join(', ')}.`
     );
   }
   if (warnings.length > 0 && config.DEBUG_LOG) {
@@ -53,3 +56,4 @@ function validateConfig() {
 module.exports = config;
 module.exports.validateConfig = validateConfig;
 module.exports.VALID_PROVIDERS = VALID_PROVIDERS;
+module.exports.getAiProviderFromEnv = getAiProviderFromEnv;

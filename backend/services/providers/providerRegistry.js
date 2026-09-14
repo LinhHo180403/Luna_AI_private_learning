@@ -34,8 +34,8 @@ function resolveProvider(name, registry = providerRegistry) {
   return assertProviderContract(provider);
 }
 
-function getConfiguredProvider() {
-  return resolveProvider(config.AI_PROVIDER);
+function getConfiguredProvider(providerName = config.AI_PROVIDER) {
+  return resolveProvider(providerName);
 }
 
 module.exports = {
