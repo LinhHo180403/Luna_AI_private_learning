@@ -1,4 +1,5 @@
 require('dotenv').config();
+const logger = require('../core/logger');
 
 const VALID_PROVIDERS = ['offline', 'nara'];
 
@@ -48,7 +49,7 @@ function validateConfig() {
     );
   }
   if (warnings.length > 0 && config.DEBUG_LOG) {
-    warnings.forEach((w) => console.warn(w));
+    warnings.forEach((w) => logger.warn(w));
   }
   return warnings;
 }

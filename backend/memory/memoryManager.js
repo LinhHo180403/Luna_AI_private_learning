@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const config = require('../config/config');
+const logger = require('../core/logger');
 
 const MEMORY_PATH = path.resolve(__dirname, '..', config.MEMORY_FILE_PATH.replace(/^\.\//, ''));
 
@@ -21,7 +22,7 @@ function readMemory() {
     const raw = fs.readFileSync(MEMORY_PATH, 'utf-8');
     return JSON.parse(raw);
   } catch (err) {
-    console.error('[memoryManager] Lỗi đọc memory.json, trả về memory rỗng:', err.message);
+    logger.error('[memoryManager] Lỗi đọc memory.json, trả về memory rỗng:', err.message);
     return { name: null, preferences: {}, notes: [], updatedAt: new Date().toISOString() };
   }
 }

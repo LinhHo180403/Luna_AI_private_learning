@@ -6,6 +6,7 @@ const sessionManager = require('./session/sessionManager');
 const eventBus = require('./events/eventBus');
 const EventTypes = require('./events/eventTypes');
 const { readMemory, resetMemory } = require('./memory/memoryManager');
+const logger = require('./core/logger');
 
 config.validateConfig();
 
@@ -40,11 +41,12 @@ app.use((err, req, res, next) => {
 });
 
 if (config.DEBUG_LOG) {
-  eventBus.on(EventTypes.USER_MESSAGE, (e) => console.log('[event] USER_MESSAGE:', { length: e.message?.length || 0 }));
-  eventBus.on(EventTypes.SKILL_HANDLED, (e) => console.log('[event] SKILL_HANDLED:', e.skill));
-  eventBus.on(EventTypes.AI_REPLY, () => console.log('[event] AI_REPLY'));
-  eventBus.on(EventTypes.MEMORY_UPDATED, () => console.log('[event] MEMORY_UPDATED'));
-  eventBus.on(EventTypes.ERROR, (e) => console.log('[event] ERROR:', e));
+  eventBus.on(EventTypes.USER_MESSAGE, (e) => logger.debug('[event] USER_MESSAGE', { length: e.message?.length || 0 }));
+  eventBus.on(EventTypes.SKILL_HANDLED, (e) => logger.debug('[event] SKILL_HANDLED', { skill: e.skill }));
+  eventBus.on(EventTypes.AI_REPLY, () => logger.debug('[event] AI_REPLY'));
+  eventBus.on(EventTypes.MEMORY_UPDATED, () => logger.debug('[event] MEMORY_UPDATED'));
+  eventBus.on(EventTypes.ERROR, (e) => logger.debug('[event] ERROR', e));
+  eventBus.on(EventTypes.STAGE_COMPLETED, (e) => logger.debug('[event] STAGE_COMPLETED', e));
 }
 
 app.get('/api/health', (req, res) => {
@@ -80,7 +82,7 @@ app.post('/api/chat', async (req, res) => {
 
     res.json(response);
   } catch (err) {
-    console.error('[server] Lỗi không mong muốn ở /api/chat:', err);
+    logger.error('[server] Lỗi không mong muốn ở /api/chat:', err.message);
     res.status(500).json({ error: 'Lỗi máy chủ nội bộ, thử lại sau.' });
   }
 });
@@ -110,7 +112,7 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('[server] Unhandled request error:', err.message);
+  logger.error('[server] Unhandled request error:', err.message);
   const status = Number.isInteger(err.status) && err.status >= 400 && err.status < 500 ? err.status : 500;
   const error = status === 400 ? 'Yêu cầu không hợp lệ.' : 'Lỗi máy chủ nội bộ, thử lại sau.';
   res.status(status).json({ error });
@@ -118,7 +120,7 @@ app.use((err, req, res, next) => {
 
 if (require.main === module) {
   app.listen(config.PORT, () => {
-    console.log(`Luna AI backend đang chạy tại http://localhost:${config.PORT} (AI_PROVIDER=${config.AI_PROVIDER})`);
+    logger.info(`Luna AI backend đang chạy tại http://localhost:${config.PORT} (AI_PROVIDER=${config.AI_PROVIDER})`);
   });
 }
 

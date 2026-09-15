@@ -3,6 +3,7 @@ const ResponseBuilder = require('../core/responseBuilder');
 const CommandTypes = require('../core/commandTypes');
 const config = require('../config/config');
 const { buildPlannerRequest } = require('../prompts/plannerPrompt');
+const logger = require('../core/logger');
 
 const PLAN_TRIGGER_PATTERN = /(lập kế hoạch|len ke hoach|kế hoạch cho|ke hoach cho|make a plan|plan for)/i;
 const TRIGGER_STRIP_PATTERN = /(lập kế hoạch cho|lập kế hoạch|len ke hoach cho|len ke hoach|kế hoạch cho|ke hoach cho|make a plan for|make a plan|plan for)/gi;
@@ -66,7 +67,7 @@ class PlannerSkill extends Skill {
         plan = await aiService.generateStructured({ system, user });
         plan.generatedBy = 'nara';
       } catch (err) {
-        console.error('[plannerSkill] Gọi AI thật thất bại, fallback offline template:', err.message);
+        logger.error('[plannerSkill] Gọi AI thật thất bại, fallback offline template:', err.message);
         plan = buildOfflinePlan(topic);
         plan.generatedBy = 'offline-fallback-after-error';
       }

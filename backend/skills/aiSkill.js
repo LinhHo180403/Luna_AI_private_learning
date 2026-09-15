@@ -1,6 +1,7 @@
 const Skill = require('./skill');
 const ResponseBuilder = require('../core/responseBuilder');
 const aiService = require('../services/aiService');
+const logger = require('../core/logger');
 
 class AiSkill extends Skill {
   constructor() {
@@ -22,7 +23,7 @@ class AiSkill extends Skill {
         .setAnimation(result.animation)
         .build();
     } catch (err) {
-      console.error('[aiSkill] aiService.getReply() lỗi:', err.message);
+      logger.error('[aiSkill] aiService.getReply() lỗi:', err.message);
       return builder
         .setReply('Luna đang gặp chút trục trặc, thử lại giúp Luna sau nha 🥲')
         .setSource('ai-error-fallback')

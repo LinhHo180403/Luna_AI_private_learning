@@ -5,6 +5,7 @@ const EventTypes = Object.freeze({
   SKILL_HANDLED: 'SKILL_HANDLED',
   ERROR: 'ERROR',
   SESSION_RESET: 'SESSION_RESET',
+  STAGE_COMPLETED: 'STAGE_COMPLETED',
 });
 
 module.exports = EventTypes;

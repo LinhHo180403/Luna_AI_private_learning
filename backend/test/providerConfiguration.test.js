@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const config = require('../config/config');
 const aiService = require('../services/aiService');
 const AiSkill = require('../skills/aiSkill');
+const logger = require('../core/logger');
 const OfflineProvider = require('../services/providers/offlineProvider');
 const NaraProvider = require('../services/providers/naraProvider');
 const { NaraProviderError } = require('../services/providers/naraProvider');
@@ -54,13 +55,13 @@ test('Nara provider failure is normalized without leaking an upstream secret', a
 
 test('AI skill preserves its safe fallback when the configured provider fails', async () => {
   const originalGetReply = aiService.getReply;
-  const originalConsoleError = console.error;
+  const originalLoggerError = logger.error;
   const secret = 'test-secret-value';
   const logs = [];
   aiService.getReply = async () => {
     throw new NaraProviderError('Nara provider request failed. Check provider configuration and service availability.', new Error(secret));
   };
-  console.error = (...args) => logs.push(args.join(' '));
+  logger.error = (...args) => logs.push(args.join(' '));
 
   try {
     const response = await new AiSkill().handle({ message: 'hello' });
@@ -69,6 +70,6 @@ test('AI skill preserves its safe fallback when the configured provider fails', 
     assert.ok(logs.every((entry) => !entry.includes(secret)));
   } finally {
     aiService.getReply = originalGetReply;
-    console.error = originalConsoleError;
+    logger.error = originalLoggerError;
   }
 });
