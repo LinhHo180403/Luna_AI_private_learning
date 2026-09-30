@@ -1,5 +1,4 @@
 const { OFFLINE_REPLY_TEMPLATES, fillTemplate } = require('../prompts/lunaPrompt');
-const { readMemory } = require('../memory/memoryManager');
 
 const INTENT_PATTERNS = [
   { intent: 'greeting', pattern: /^(chào|xin chào|hi|hello|hey|alo|ê|ê luna)\b/i },
@@ -23,7 +22,7 @@ function pickVariant(list) {
 
 function generateOfflineReply(context) {
   const message = (context && context.message) || '';
-  const memory = readMemory();
+  const memory = (context && context.memory) || {};
   const name = memory && memory.name ? memory.name : null;
 
   const intent = detectIntent(message);

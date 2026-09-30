@@ -1,7 +1,7 @@
 const SKILL_ORDER = require('../skills/index');
 const eventBus = require('../events/eventBus');
 const EventTypes = require('../events/eventTypes');
-const { readMemory } = require('../memory/memoryManager');
+const defaultMemoryManager = require('../memory/memoryManager');
 const {
   createEmptyMessageResponse,
   createNoSkillResponse,
@@ -11,6 +11,11 @@ const {
 } = require('../core/pipeline');
 
 class LunaBrain {
+  constructor({ memoryManager = defaultMemoryManager, skillOrder = SKILL_ORDER } = {}) {
+    this.memoryManager = memoryManager;
+    this.skillOrder = skillOrder;
+  }
+
   async processMessage({ message, session } = {}) {
     const trimmed = (message || '').trim();
 
@@ -20,11 +25,11 @@ class LunaBrain {
       return this.runStage('postProcess', () => postProcess(createEmptyMessageResponse()));
     }
 
-    const memory = readMemory();
+    const memory = this.memoryManager.readMemory();
     const context = { message: trimmed, session: session || null, memory };
 
     const onError = (payload) => eventBus.emit(EventTypes.ERROR, payload);
-    const skill = await this.runStage('matchSkill', () => matchSkill(context, SKILL_ORDER, { onError }));
+    const skill = await this.runStage('matchSkill', () => matchSkill(context, this.skillOrder, { onError }));
 
     if (!skill) {
       return this.runStage('postProcess', () => postProcess(createNoSkillResponse(), context));

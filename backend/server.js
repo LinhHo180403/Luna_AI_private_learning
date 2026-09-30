@@ -104,9 +104,14 @@ app.get('/api/memory', (req, res) => {
 });
 
 app.post('/api/memory/reset', (req, res) => {
-  const reset = resetMemory();
-  eventBus.emit(EventTypes.MEMORY_UPDATED, { memory: reset });
-  res.json(reset);
+  try {
+    const reset = resetMemory();
+    eventBus.emit(EventTypes.MEMORY_UPDATED, { memory: reset });
+    res.json(reset);
+  } catch (err) {
+    logger.error('[memory] Could not reset persistent memory.', { error: err.name });
+    res.status(500).json({ error: 'Không thể reset memory hiện tại.' });
+  }
 });
 
 app.post('/api/session/:sessionId/reset', (req, res) => {
