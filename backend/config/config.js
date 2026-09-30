@@ -29,6 +29,7 @@ const config = {
   AI_TIMEOUT_MS: parseIntSafe(process.env.AI_TIMEOUT_MS, 20000),
   MAX_HISTORY_MESSAGES: parseIntSafe(process.env.MAX_HISTORY_MESSAGES, 12),
   MEMORY_FILE_PATH: process.env.MEMORY_FILE_PATH || './memory/memory.json',
+  CHAT_ARCHIVE_FILE_PATH: process.env.CHAT_ARCHIVE_FILE_PATH || './data/chat-archive.json',
   DEBUG_LOG: parseBoolean(process.env.DEBUG_LOG, true),
   CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:5173',
 };

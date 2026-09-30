@@ -6,6 +6,7 @@ const sessionManager = require('./session/sessionManager');
 const eventBus = require('./events/eventBus');
 const EventTypes = require('./events/eventTypes');
 const { readMemory, resetMemory } = require('./memory/memoryManager');
+const { chatArchiveManager } = require('./archive/chatArchiveManager');
 const logger = require('./core/logger');
 
 config.validateConfig();
@@ -75,6 +76,17 @@ app.post('/api/chat', async (req, res) => {
 
     sessionManager.addMessage(sid, 'user', message);
     sessionManager.addMessage(sid, 'assistant', response.reply);
+
+    try {
+      chatArchiveManager.appendConversationTurn({
+        sessionId: sid,
+        userMessage: message,
+        assistantMessage: response.reply,
+        assistantSource: response.source,
+      });
+    } catch (err) {
+      logger.error('[chatArchive] Could not persist completed chat turn.', { sessionId: sid, error: err.name });
+    }
 
     if (response.memory) {
       eventBus.emit(EventTypes.MEMORY_UPDATED, { memory: response.memory });
