@@ -1,40 +1,50 @@
 const config = require('../config/config');
 
-const sessions = new Map();
+function createSessionManager({ maxHistoryMessages = config.MAX_HISTORY_MESSAGES, now = () => new Date().toISOString() } = {}) {
+  const sessions = new Map();
 
-function getOrCreateSession(sessionId = 'default') {
-  if (!sessions.has(sessionId)) {
-    sessions.set(sessionId, { history: [], createdAt: new Date().toISOString() });
+  function createSession() {
+    const timestamp = now();
+    return { history: [], createdAt: timestamp, updatedAt: timestamp };
   }
-  return sessions.get(sessionId);
-}
 
-function addMessage(sessionId, role, content) {
-  const session = getOrCreateSession(sessionId);
-  session.history.push({ role, content, timestamp: new Date().toISOString() });
-
-  const maxMessages = config.MAX_HISTORY_MESSAGES;
-  if (session.history.length > maxMessages) {
-    session.history = session.history.slice(session.history.length - maxMessages);
+  function getOrCreateSession(sessionId = 'default') {
+    if (!sessions.has(sessionId)) sessions.set(sessionId, createSession());
+    return sessions.get(sessionId);
   }
-  return session;
+
+  function addMessage(sessionId, role, content) {
+    const session = getOrCreateSession(sessionId);
+    const timestamp = now();
+    session.history.push({ role, content, timestamp });
+    if (session.history.length > maxHistoryMessages) {
+      session.history = session.history.slice(session.history.length - maxHistoryMessages);
+    }
+    session.updatedAt = timestamp;
+    return session;
+  }
+
+  function getHistory(sessionId = 'default') {
+    return getOrCreateSession(sessionId).history;
+  }
+
+  function getSession(sessionId = 'default') {
+    return getOrCreateSession(sessionId);
+  }
+
+  function resetSession(sessionId = 'default') {
+    const session = createSession();
+    sessions.set(sessionId, session);
+    return session;
+  }
+
+  function listSessionIds() {
+    return Array.from(sessions.keys());
+  }
+
+  return { getOrCreateSession, addMessage, getHistory, getSession, resetSession, listSessionIds };
 }
 
-function getHistory(sessionId = 'default') {
-  return getOrCreateSession(sessionId).history;
-}
+const sessionManager = createSessionManager();
 
-function getSession(sessionId = 'default') {
-  return getOrCreateSession(sessionId);
-}
-
-function resetSession(sessionId = 'default') {
-  sessions.set(sessionId, { history: [], createdAt: new Date().toISOString() });
-  return sessions.get(sessionId);
-}
-
-function listSessionIds() {
-  return Array.from(sessions.keys());
-}
-
-module.exports = { getOrCreateSession, addMessage, getHistory, getSession, resetSession, listSessionIds };
+module.exports = { ...sessionManager, createSessionManager };
