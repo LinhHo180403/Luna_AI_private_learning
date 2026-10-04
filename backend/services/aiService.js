@@ -4,6 +4,8 @@ const { LUNA_SYSTEM_PROMPT } = require('../prompts/lunaPrompt');
 const { getConfiguredProvider } = require('./providers/providerRegistry');
 const { normalizeProviderResponse } = require('./providers/providerResponse');
 
+const MAX_MEMORY_CONTEXT_NOTES = 3;
+
 class AiServiceError extends Error {
   constructor(message, cause) {
     super(message);
@@ -17,7 +19,9 @@ function formatMemoryForPrompt(memory) {
   const profile = {
     ...(typeof memory.name === 'string' && memory.name ? { name: memory.name } : {}),
     ...(memory.preferences && Object.keys(memory.preferences).length ? { preferences: memory.preferences } : {}),
-    ...(Array.isArray(memory.notes) && memory.notes.length ? { notes: memory.notes } : {}),
+    ...(Array.isArray(memory.notes) && memory.notes.length
+      ? { notes: memory.notes.slice(-MAX_MEMORY_CONTEXT_NOTES) }
+      : {}),
     ...(Array.isArray(memory.goals) && memory.goals.length ? { goals: memory.goals } : {}),
   };
   if (Object.keys(profile).length === 0) return '';
@@ -59,4 +63,10 @@ async function generateStructured({ system, user }) {
   }
 }
 
-module.exports = { getReply, generateStructured, formatMemoryForPrompt, AiServiceError };
+module.exports = {
+  getReply,
+  generateStructured,
+  formatMemoryForPrompt,
+  MAX_MEMORY_CONTEXT_NOTES,
+  AiServiceError,
+};

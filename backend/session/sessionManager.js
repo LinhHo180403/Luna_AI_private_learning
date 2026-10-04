@@ -1,6 +1,28 @@
 const config = require('../config/config');
+const defaultMemoryManager = require('../memory/memoryManager');
+const logger = require('../core/logger');
 
-function createSessionManager({ maxHistoryMessages = config.MAX_HISTORY_MESSAGES, now = () => new Date().toISOString() } = {}) {
+const MAX_SUMMARY_LENGTH = 240;
+
+function summarizeDiscardedMessages(messages) {
+  const fragments = messages
+    .map(({ role, content }) => {
+      const text = String(content ?? '').replace(/\s+/g, ' ').trim();
+      if (!text) return null;
+      const speaker = role === 'assistant' ? 'Luna' : 'Người dùng';
+      return `${speaker}: ${text}`;
+    })
+    .filter(Boolean);
+
+  if (fragments.length === 0) return null;
+  return `Tóm tắt hội thoại cũ: ${fragments.join(' | ')}`.slice(0, MAX_SUMMARY_LENGTH);
+}
+
+function createSessionManager({
+  maxHistoryMessages = config.MAX_HISTORY_MESSAGES,
+  now = () => new Date().toISOString(),
+  memoryManager = defaultMemoryManager,
+} = {}) {
   const sessions = new Map();
 
   function createSession() {
@@ -18,7 +40,19 @@ function createSessionManager({ maxHistoryMessages = config.MAX_HISTORY_MESSAGES
     const timestamp = now();
     session.history.push({ role, content, timestamp });
     if (session.history.length > maxHistoryMessages) {
+      const discarded = session.history.slice(0, session.history.length - maxHistoryMessages);
       session.history = session.history.slice(session.history.length - maxHistoryMessages);
+      const summary = summarizeDiscardedMessages(discarded);
+      if (summary) {
+        try {
+          memoryManager.patchMemory({ notes: [summary] });
+        } catch (err) {
+          logger.error('[sessionManager] Could not persist trimmed history summary.', {
+            sessionId,
+            error: err.name,
+          });
+        }
+      }
     }
     session.updatedAt = timestamp;
     return session;
@@ -47,4 +81,4 @@ function createSessionManager({ maxHistoryMessages = config.MAX_HISTORY_MESSAGES
 
 const sessionManager = createSessionManager();
 
-module.exports = { ...sessionManager, createSessionManager };
+module.exports = { ...sessionManager, createSessionManager, summarizeDiscardedMessages, MAX_SUMMARY_LENGTH };
