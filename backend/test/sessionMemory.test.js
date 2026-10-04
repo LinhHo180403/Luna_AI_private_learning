@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
 const { createSessionManager } = require('../session/sessionManager');
 const aiService = require('../services/aiService');
 const { createChatArchiveManager } = require('../archive/chatArchiveManager');
+const { createMemoryManager } = require('../memory/memoryManager');
 
 function createClock() {
   let index = 0;
@@ -46,6 +47,27 @@ test('session memory caps history by message count and updates session timestamp
     { role: 'assistant', content: 'four' },
   ]);
   assert.notEqual(updated.updatedAt, createdUpdatedAt);
+});
+
+test('trimmed session history is summarized into persistent long-term memory', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'luna-session-summary-'));
+  const memory = createMemoryManager(path.join(directory, 'memory.json'), { now: createClock() });
+  const manager = createSessionManager({ maxHistoryMessages: 2, now: createClock(), memoryManager: memory });
+  try {
+    manager.addMessage('summary', 'user', 'I am building Luna AI on desktop');
+    manager.addMessage('summary', 'assistant', 'That sounds exciting');
+    manager.addMessage('summary', 'user', 'Please keep the architecture simple');
+
+    assert.deepEqual(manager.getHistory('summary').map((item) => item.content), [
+      'That sounds exciting',
+      'Please keep the architecture simple',
+    ]);
+    assert.deepEqual(memory.readMemory().notes, [
+      'Tóm tắt hội thoại cũ: Người dùng: I am building Luna AI on desktop',
+    ]);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test('session reset affects only its runtime session and a new manager simulates restart', () => {

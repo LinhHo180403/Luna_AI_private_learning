@@ -44,7 +44,11 @@ test('aiService formats long-term memory into the Nara system prompt without arc
     },
   });
   const memory = {
-    version: 1, name: 'Linh', preferences: { likes: ['anime'] }, notes: ['desktop-first'], goals: ['finish Luna AI'],
+    version: 1,
+    name: 'Linh',
+    preferences: { likes: ['anime'] },
+    notes: ['old note', 'desktop-first', 'explicit memory only', 'latest note'],
+    goals: ['finish Luna AI'],
   };
 
   await aiService.getReply({
@@ -59,6 +63,9 @@ test('aiService formats long-term memory into the Nara system prompt without arc
   ]);
   assert.match(receivedRequest.systemPrompt, /Linh/);
   assert.match(receivedRequest.systemPrompt, /anime/);
+  assert.match(receivedRequest.systemPrompt, /desktop-first/);
+  assert.match(receivedRequest.systemPrompt, /latest note/);
+  assert.doesNotMatch(receivedRequest.systemPrompt, /old note/);
   assert.doesNotMatch(receivedRequest.systemPrompt, /archive/i);
 });
 
