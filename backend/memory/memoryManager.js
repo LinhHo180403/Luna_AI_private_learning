@@ -112,41 +112,87 @@ function createMemoryManager(
   { fileSystem = fs, now = () => new Date().toISOString() } = {}
 ) {
   const memoryPath = path.resolve(__dirname, '..', filePath.replace(/^\.\//, ''));
+  const backupPath = `${memoryPath}.bak`;
 
-  function writeAtomically(memory) {
-    const directory = path.dirname(memoryPath);
+  function writeAtomically(targetPath, memory, label) {
+    const directory = path.dirname(targetPath);
     const temporaryPath = path.join(
       directory,
-      `.${path.basename(memoryPath)}.${process.pid}.${Date.now()}.tmp`
+      `.${path.basename(targetPath)}.${process.pid}.${Date.now()}.tmp`
     );
 
     try {
       fileSystem.writeFileSync(temporaryPath, JSON.stringify(memory, null, 2), 'utf-8');
-      fileSystem.renameSync(temporaryPath, memoryPath);
+      fileSystem.renameSync(temporaryPath, targetPath);
     } catch (err) {
       try {
         if (fileSystem.existsSync(temporaryPath)) fileSystem.unlinkSync(temporaryPath);
       } catch {
         // Keep the original write error; cleanup is best effort.
       }
-      throw new MemoryManagerError('Memory file could not be written.', err);
+      throw new MemoryManagerError(`Memory ${label} could not be written.`, err);
+    }
+  }
+
+  function writeBackup(memory) {
+    try {
+      writeAtomically(backupPath, memory, 'backup');
+    } catch (err) {
+      // Primary memory is already valid; keep serving it and retain any previous backup.
+      logger.error('[memoryManager] Could not update persistent memory backup.', { error: err.name });
+    }
+  }
+
+  function createInitialMemory() {
+    const initial = createDefaultMemory(now);
+    writeAtomically(memoryPath, initial, 'file');
+    writeBackup(initial);
+    return initial;
+  }
+
+  function ensureMemoryDirectory() {
+    const directory = path.dirname(memoryPath);
+    if (!fileSystem.existsSync(directory)) fileSystem.mkdirSync(directory, { recursive: true });
+  }
+
+  function readStoredMemory(targetPath, label) {
+    try {
+      return normalizeMemory(JSON.parse(fileSystem.readFileSync(targetPath, 'utf-8')), { now });
+    } catch (err) {
+      if (err instanceof MemoryManagerError) throw err;
+      throw new MemoryManagerError(`Memory ${label} could not be read.`, err);
+    }
+  }
+
+  function restoreFromBackup() {
+    const backup = readStoredMemory(backupPath, 'backup');
+    writeAtomically(memoryPath, backup, 'file');
+    return backup;
+  }
+
+  function readMemoryStrict() {
+    ensureMemoryDirectory();
+    if (!fileSystem.existsSync(memoryPath)) {
+      if (fileSystem.existsSync(backupPath)) return restoreFromBackup();
+      return createInitialMemory();
+    }
+
+    try {
+      const memory = readStoredMemory(memoryPath, 'file');
+      if (!fileSystem.existsSync(backupPath)) writeBackup(memory);
+      return memory;
+    } catch (primaryError) {
+      if (!fileSystem.existsSync(backupPath)) throw primaryError;
+      try {
+        return restoreFromBackup();
+      } catch (backupError) {
+        throw new MemoryManagerError('Memory file and backup could not be recovered.', backupError);
+      }
     }
   }
 
   function ensureMemoryFile() {
-    const directory = path.dirname(memoryPath);
-    if (!fileSystem.existsSync(directory)) fileSystem.mkdirSync(directory, { recursive: true });
-    if (!fileSystem.existsSync(memoryPath)) writeAtomically(createDefaultMemory(now));
-  }
-
-  function readMemoryStrict() {
-    ensureMemoryFile();
-    try {
-      return normalizeMemory(JSON.parse(fileSystem.readFileSync(memoryPath, 'utf-8')), { now });
-    } catch (err) {
-      if (err instanceof MemoryManagerError) throw err;
-      throw new MemoryManagerError('Memory file could not be read.', err);
-    }
+    return readMemoryStrict();
   }
 
   function readMemory() {
@@ -164,7 +210,8 @@ function createMemoryManager(
     const normalized = normalizeMemory(memoryObj, { now });
     if (hasSameMemoryContent(current, normalized)) return current;
     const toWrite = { ...normalized, updatedAt: now() };
-    writeAtomically(toWrite);
+    writeAtomically(memoryPath, toWrite, 'file');
+    writeBackup(toWrite);
     return toWrite;
   }
 
@@ -186,7 +233,15 @@ function createMemoryManager(
     return writeMemory(createDefaultMemory(now));
   }
 
-  return { memoryPath, ensureMemoryFile, readMemory, writeMemory, patchMemory, resetMemory };
+  return {
+    memoryPath,
+    backupPath,
+    ensureMemoryFile,
+    readMemory,
+    writeMemory,
+    patchMemory,
+    resetMemory,
+  };
 }
 
 const memoryManager = createMemoryManager();

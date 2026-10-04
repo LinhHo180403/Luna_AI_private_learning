@@ -36,7 +36,23 @@ function createFailingFileSystem(method) {
   };
 }
 
-test('missing memory file creates the versioned default schema', () => {
+function createBackupFailingFileSystem() {
+  return {
+    existsSync: fs.existsSync,
+    mkdirSync: fs.mkdirSync,
+    readFileSync: fs.readFileSync,
+    unlinkSync: fs.unlinkSync,
+    renameSync: fs.renameSync,
+    writeFileSync: (targetPath, ...args) => {
+      if (path.basename(targetPath).startsWith('.memory.json.bak.')) {
+        throw new Error('simulated backup write failure');
+      }
+      return fs.writeFileSync(targetPath, ...args);
+    },
+  };
+}
+
+test('missing memory file creates the versioned default schema and backup', () => {
   const { directory, memoryPath, manager } = createTestManager();
   try {
     const memory = manager.readMemory();
@@ -45,6 +61,8 @@ test('missing memory file creates the versioned default schema', () => {
       version: 1, name: null, preferences: {}, notes: [], goals: [], updatedAt: '2026-01-01T00:00:00.000Z',
     });
     assert.equal(fs.existsSync(memoryPath), true);
+    assert.equal(fs.existsSync(manager.backupPath), true);
+    assert.deepEqual(JSON.parse(fs.readFileSync(manager.backupPath, 'utf-8')), memory);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
@@ -99,9 +117,70 @@ test('memory updates merge name, preferences, notes, and goals with a new timest
     assert.deepEqual(merged.preferences.likes, ['anime', 'coding']);
     assert.deepEqual(merged.notes, ['desktop-first']);
     assert.notEqual(updated.updatedAt, named.updatedAt);
+    assert.deepEqual(JSON.parse(fs.readFileSync(manager.backupPath, 'utf-8')), merged);
 
     const unchanged = manager.patchMemory({ notes: ['desktop-first'] });
     assert.equal(unchanged.updatedAt, merged.updatedAt);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('a valid backup restores a corrupted primary memory after manager restart', () => {
+  const { directory, memoryPath, manager } = createTestManager();
+  try {
+    const saved = manager.patchMemory({ name: 'Linh', goals: ['finish Luna AI'] });
+    fs.writeFileSync(memoryPath, '{corrupted primary}', 'utf-8');
+    const restartedManager = createMemoryManager(memoryPath, { now: createClock() });
+
+    assert.deepEqual(restartedManager.readMemory(), saved);
+    assert.deepEqual(JSON.parse(fs.readFileSync(memoryPath, 'utf-8')), saved);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('a valid backup restores a missing primary memory', () => {
+  const { directory, memoryPath, manager } = createTestManager();
+  try {
+    const saved = manager.patchMemory({ name: 'Linh' });
+    fs.unlinkSync(memoryPath);
+    const restartedManager = createMemoryManager(memoryPath, { now: createClock() });
+
+    assert.deepEqual(restartedManager.readMemory(), saved);
+    assert.deepEqual(JSON.parse(fs.readFileSync(memoryPath, 'utf-8')), saved);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('corrupted primary and backup files are preserved when recovery is impossible', () => {
+  const { directory, memoryPath, manager } = createTestManager();
+  try {
+    manager.patchMemory({ name: 'Linh' });
+    fs.writeFileSync(memoryPath, '{bad primary}', 'utf-8');
+    fs.writeFileSync(manager.backupPath, '{bad backup}', 'utf-8');
+
+    assert.equal(manager.readMemory().version, MEMORY_VERSION);
+    assert.throws(() => manager.patchMemory({ notes: ['must not overwrite'] }), MemoryManagerError);
+    assert.equal(fs.readFileSync(memoryPath, 'utf-8'), '{bad primary}');
+    assert.equal(fs.readFileSync(manager.backupPath, 'utf-8'), '{bad backup}');
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('a backup write failure preserves the valid primary memory', () => {
+  const { directory, memoryPath } = createTestManager();
+  try {
+    const manager = createMemoryManager(memoryPath, {
+      fileSystem: createBackupFailingFileSystem(), now: createClock(),
+    });
+    const saved = manager.patchMemory({ name: 'Linh' });
+
+    assert.equal(saved.name, 'Linh');
+    assert.deepEqual(JSON.parse(fs.readFileSync(memoryPath, 'utf-8')).name, 'Linh');
+    assert.equal(fs.existsSync(manager.backupPath), false);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }

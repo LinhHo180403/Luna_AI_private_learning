@@ -15,6 +15,7 @@ pnpm-debug.log*
 
 # Single-user runtime memory; it is generated and may contain personal data.
 backend/memory/memory.json
+backend/memory/memory.json.bak
 backend/data/chat-archive.json
 
 # OS files
