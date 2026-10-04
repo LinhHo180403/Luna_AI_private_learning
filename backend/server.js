@@ -7,6 +7,9 @@ const eventBus = require('./events/eventBus');
 const EventTypes = require('./events/eventTypes');
 const { readMemory, resetMemory } = require('./memory/memoryManager');
 const { chatArchiveManager } = require('./archive/chatArchiveManager');
+const { formatMemoryForPrompt } = require('./services/aiService');
+const { callNaraStream } = require('./services/naraService');
+const { LUNA_SYSTEM_PROMPT } = require('./prompts/lunaPrompt');
 const logger = require('./core/logger');
 
 config.validateConfig();
@@ -28,6 +31,26 @@ function getValidatedSessionId(sessionId, fallbackToDefault = true) {
     return null;
   }
   return sessionId;
+}
+
+function writeSseEvent(res, event, payload) {
+  res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+}
+
+function persistCompletedChatTurn(sessionId, message, response) {
+  sessionManager.addMessage(sessionId, 'user', message);
+  sessionManager.addMessage(sessionId, 'assistant', response.reply);
+
+  try {
+    chatArchiveManager.appendConversationTurn({
+      sessionId,
+      userMessage: message,
+      assistantMessage: response.reply,
+      assistantSource: response.source,
+    });
+  } catch (err) {
+    logger.error('[chatArchive] Could not persist completed chat turn.', { sessionId, error: err.name });
+  }
 }
 
 const app = express();
@@ -74,19 +97,7 @@ app.post('/api/chat', async (req, res) => {
     const session = sessionManager.getSession(sid);
     const response = await lunaBrain.processMessage({ message, session });
 
-    sessionManager.addMessage(sid, 'user', message);
-    sessionManager.addMessage(sid, 'assistant', response.reply);
-
-    try {
-      chatArchiveManager.appendConversationTurn({
-        sessionId: sid,
-        userMessage: message,
-        assistantMessage: response.reply,
-        assistantSource: response.source,
-      });
-    } catch (err) {
-      logger.error('[chatArchive] Could not persist completed chat turn.', { sessionId: sid, error: err.name });
-    }
+    persistCompletedChatTurn(sid, message, response);
 
     if (response.memory) {
       eventBus.emit(EventTypes.MEMORY_UPDATED, { memory: response.memory });
@@ -96,6 +107,69 @@ app.post('/api/chat', async (req, res) => {
   } catch (err) {
     logger.error('[server] Lỗi không mong muốn ở /api/chat:', err.message);
     res.status(500).json({ error: 'Lỗi máy chủ nội bộ, thử lại sau.' });
+  }
+});
+
+app.post('/api/chat/stream', async (req, res) => {
+  const { message, sessionId } = req.body || {};
+  if (typeof message !== 'string' || !message.trim() || message.length > MAX_MESSAGE_LENGTH) {
+    return res.status(400).json({ error: 'Field "message" không hợp lệ.' });
+  }
+  const sid = getValidatedSessionId(sessionId);
+  if (!sid) return res.status(400).json({ error: 'Field "sessionId" không hợp lệ.' });
+
+  res.status(200);
+  res.set({
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.flushHeaders();
+
+  try {
+    const session = sessionManager.getSession(sid);
+    let response;
+
+    if (config.AI_PROVIDER === 'nara') {
+      const memory = readMemory();
+      const messages = [
+        ...session.history.map(({ role, content }) => ({ role, content })),
+        { role: 'user', content: message },
+      ];
+      let reply = '';
+      reply = await callNaraStream({
+        messages,
+        systemPrompt: `${LUNA_SYSTEM_PROMPT}${formatMemoryForPrompt(memory)}`,
+        onToken: (token) => {
+          reply += token;
+          if (!res.writableEnded) writeSseEvent(res, 'token', { token });
+        },
+      });
+      response = {
+        reply,
+        source: 'nara',
+        emotion: 'neutral',
+        animation: 'talk',
+        voice: true,
+        commands: [],
+        memory: null,
+        data: null,
+        timestamp: new Date().toISOString(),
+      };
+    } else {
+      response = await lunaBrain.processMessage({ message, session });
+      writeSseEvent(res, 'token', { token: response.reply });
+    }
+
+    persistCompletedChatTurn(sid, message, response);
+    if (response.memory) eventBus.emit(EventTypes.MEMORY_UPDATED, { memory: response.memory });
+    writeSseEvent(res, 'done', { response });
+  } catch (err) {
+    logger.error('[stream] Could not complete streamed chat response.', { error: err.name });
+    writeSseEvent(res, 'error', { error: 'Không thể hoàn tất phản hồi streaming.' });
+  } finally {
+    res.end();
   }
 });
 
