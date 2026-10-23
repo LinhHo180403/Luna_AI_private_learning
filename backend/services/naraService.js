@@ -75,6 +75,7 @@ async function callNaraStream({
   baseUrl = config.AI_BASE_URL,
   model = config.AI_MODEL,
   timeoutMs = config.AI_TIMEOUT_MS,
+  signal: externalSignal,
 } = {}) {
   if (!apiKey) {
     throw new NaraServiceError('AI_API_KEY đang rỗng nhưng đang cố gọi NaraRouter API thật.');
@@ -87,7 +88,14 @@ async function callNaraStream({
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+  const abortFromClient = () => controller.abort();
+  if (externalSignal?.aborted) abortFromClient();
+  externalSignal?.addEventListener('abort', abortFromClient, { once: true });
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
   const payload = {
     model,
     stream: true,
@@ -117,6 +125,8 @@ async function callNaraStream({
     }
 
     const reader = response.body.getReader();
+    const cancelReader = () => reader.cancel().catch(() => {});
+    externalSignal?.addEventListener('abort', cancelReader, { once: true });
     const decoder = new TextDecoder();
     let buffer = '';
     let reply = '';
@@ -143,6 +153,11 @@ async function callNaraStream({
     }
 
     while (!streamDone) {
+      if (externalSignal?.aborted) {
+        const aborted = new Error('Nara stream was aborted by the client.');
+        aborted.name = 'AbortError';
+        throw aborted;
+      }
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
@@ -158,13 +173,20 @@ async function callNaraStream({
     }
     return reply;
   } catch (err) {
+    if (externalSignal?.aborted) {
+      const aborted = new Error('Nara stream was aborted by the client.');
+      aborted.name = 'AbortError';
+      throw aborted;
+    }
     if (err.name === 'AbortError') {
-      throw new NaraServiceError(`NaraRouter timeout sau ${timeoutMs}ms.`, err);
+      if (timedOut) throw new NaraServiceError(`NaraRouter timeout sau ${timeoutMs}ms.`, err);
+      throw err;
     }
     if (err instanceof NaraServiceError) throw err;
     throw new NaraServiceError(`Lỗi khi stream NaraRouter: ${err.message}`, err);
   } finally {
     clearTimeout(timeoutId);
+    externalSignal?.removeEventListener('abort', abortFromClient);
   }
 }
 

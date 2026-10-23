@@ -41,6 +41,18 @@ async function getReply(context, { provider = getConfiguredProvider() } = {}) {
   return normalizeProviderResponse(response, provider.name);
 }
 
+async function getStreamingReply(context, { onToken, signal } = {}) {
+  if (config.AI_PROVIDER !== 'nara') return getReply(context);
+  const history = (context.session && context.session.history) || [];
+  const messages = [
+    ...history.map((h) => ({ role: h.role, content: h.content })),
+    { role: 'user', content: context.message },
+  ];
+  const systemPrompt = `${LUNA_SYSTEM_PROMPT}${formatMemoryForPrompt(context.memory)}`;
+  const reply = await naraService.callNaraStream({ messages, systemPrompt, onToken, signal });
+  return normalizeProviderResponse({ reply, emotion: 'neutral', animation: 'talk' }, 'nara');
+}
+
 async function generateStructured({ system, user }) {
   if (config.AI_PROVIDER !== 'nara') {
     throw new AiServiceError(
@@ -65,6 +77,7 @@ async function generateStructured({ system, user }) {
 
 module.exports = {
   getReply,
+  getStreamingReply,
   generateStructured,
   formatMemoryForPrompt,
   MAX_MEMORY_CONTEXT_NOTES,

@@ -7,9 +7,6 @@ const eventBus = require('./events/eventBus');
 const EventTypes = require('./events/eventTypes');
 const { readMemory, resetMemory } = require('./memory/memoryManager');
 const { chatArchiveManager } = require('./archive/chatArchiveManager');
-const { formatMemoryForPrompt } = require('./services/aiService');
-const { callNaraStream } = require('./services/naraService');
-const { LUNA_SYSTEM_PROMPT } = require('./prompts/lunaPrompt');
 const logger = require('./core/logger');
 
 config.validateConfig();
@@ -34,7 +31,9 @@ function getValidatedSessionId(sessionId, fallbackToDefault = true) {
 }
 
 function writeSseEvent(res, event, payload) {
-  res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+  if (!res.writableEnded && !res.destroyed) {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+  }
 }
 
 function persistCompletedChatTurn(sessionId, message, response) {
@@ -127,49 +126,42 @@ app.post('/api/chat/stream', async (req, res) => {
   });
   res.flushHeaders();
 
+  const controller = new AbortController();
+  let clientDisconnected = false;
+  const handleClose = () => {
+    if (!res.writableEnded) {
+      clientDisconnected = true;
+      controller.abort();
+    }
+  };
+  res.on('close', handleClose);
+
   try {
     const session = sessionManager.getSession(sid);
-    let response;
+    let streamedToken = false;
+    const response = await lunaBrain.processMessage({
+      message,
+      session,
+      signal: controller.signal,
+      onToken: (token) => {
+        streamedToken = true;
+        writeSseEvent(res, 'token', { token });
+      },
+    });
 
-    if (config.AI_PROVIDER === 'nara') {
-      const memory = readMemory();
-      const messages = [
-        ...session.history.map(({ role, content }) => ({ role, content })),
-        { role: 'user', content: message },
-      ];
-      let reply = '';
-      reply = await callNaraStream({
-        messages,
-        systemPrompt: `${LUNA_SYSTEM_PROMPT}${formatMemoryForPrompt(memory)}`,
-        onToken: (token) => {
-          reply += token;
-          if (!res.writableEnded) writeSseEvent(res, 'token', { token });
-        },
-      });
-      response = {
-        reply,
-        source: 'nara',
-        emotion: 'neutral',
-        animation: 'talk',
-        voice: true,
-        commands: [],
-        memory: null,
-        data: null,
-        timestamp: new Date().toISOString(),
-      };
-    } else {
-      response = await lunaBrain.processMessage({ message, session });
-      writeSseEvent(res, 'token', { token: response.reply });
-    }
+    if (clientDisconnected || controller.signal.aborted) return;
+    if (!streamedToken) writeSseEvent(res, 'token', { token: response.reply });
 
     persistCompletedChatTurn(sid, message, response);
     if (response.memory) eventBus.emit(EventTypes.MEMORY_UPDATED, { memory: response.memory });
     writeSseEvent(res, 'done', { response });
   } catch (err) {
+    if (clientDisconnected || controller.signal.aborted) return;
     logger.error('[stream] Could not complete streamed chat response.', { error: err.name });
     writeSseEvent(res, 'error', { error: 'Không thể hoàn tất phản hồi streaming.' });
   } finally {
-    res.end();
+    res.off('close', handleClose);
+    if (!res.writableEnded && !res.destroyed) res.end();
   }
 });
 

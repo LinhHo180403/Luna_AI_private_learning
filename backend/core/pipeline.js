@@ -45,6 +45,7 @@ async function executeSkill(skill, context, { onError } = {}) {
   try {
     return await skill.handle(context);
   } catch (err) {
+    if (context?.signal?.aborted || err?.name === 'AbortError') throw err;
     logger.error(`[lunaBrain] Skill "${skill.name}" lỗi ở handle():`, err.message);
     onError?.({ skill: skill.name, phase: 'handle', error: err.message });
     return createSkillErrorResponse(skill.name);

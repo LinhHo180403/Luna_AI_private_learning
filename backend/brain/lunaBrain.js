@@ -16,7 +16,7 @@ class LunaBrain {
     this.skillOrder = skillOrder;
   }
 
-  async processMessage({ message, session } = {}) {
+  async processMessage({ message, session, onToken, signal } = {}) {
     const trimmed = (message || '').trim();
 
     eventBus.emit(EventTypes.USER_MESSAGE, { message: trimmed, timestamp: new Date().toISOString() });
@@ -26,7 +26,7 @@ class LunaBrain {
     }
 
     const memory = this.memoryManager.readMemory();
-    const context = { message: trimmed, session: session || null, memory };
+    const context = { message: trimmed, session: session || null, memory, onToken, signal };
 
     const onError = (payload) => eventBus.emit(EventTypes.ERROR, payload);
     const skill = await this.runStage('matchSkill', () => matchSkill(context, this.skillOrder, { onError }));
