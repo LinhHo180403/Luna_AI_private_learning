@@ -8,13 +8,24 @@
 // đầu file để test bằng Node - session id, đọc/ghi localStorage có inject storage
 // để test được mà không cần trình duyệt thật.
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useReducer } from 'react';
 import axios from 'axios';
 import AvatarFace from './components/AvatarFace.jsx';
 import PlanCard from './components/PlanCard.jsx';
 import SnakeCanvasGame from './components/SnakeCanvasGame.jsx';
 import TicTacToe from './components/TicTacToe.jsx';
 import { dispatchCommands } from './core/commandDispatcher.js';
+import {
+  CONVERSATION_STATES,
+  CONVERSATION_EVENTS,
+  conversationReducer,
+  getAvatarAnimation,
+  getConversationStatusText,
+} from './core/conversationReducer.js';
+import { consumeSseResponse } from './core/sseClient.js';
+import { loadStoredMessages, saveStoredMessages } from './core/chatStorage.js';
+
+export { CONVERSATION_STATES, consumeSseResponse, loadStoredMessages, saveStoredMessages };
 
 // ============================================================================
 // PURE HELPERS (export để test bằng Node, storage được inject để không cần browser)
@@ -51,28 +62,6 @@ export function getOrCreateSessionId(storage) {
   } catch (err) {
     console.warn('[App] Không đọc/ghi được localStorage cho session id, dùng session tạm:', err.message);
     return generateSessionId();
-  }
-}
-
-export function loadStoredMessages(storage) {
-  try {
-    const raw = storage.getItem(STORAGE_KEYS.MESSAGES);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.warn('[App] Lỗi đọc lịch sử chat từ localStorage, bắt đầu lại từ rỗng:', err.message);
-    return [];
-  }
-}
-
-export function saveStoredMessages(storage, messages) {
-  try {
-    storage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
-    return true;
-  } catch (err) {
-    console.warn('[App] Lỗi lưu lịch sử chat vào localStorage:', err.message);
-    return false;
   }
 }
 
@@ -124,63 +113,6 @@ export function isSnakeSidebarTrigger(text) {
   return /(?:chơi\s+trò\s+chơi\s+con\s+rắn|play\s+snake\s+game)/iu.test(String(text || '').trim());
 }
 
-export const CONVERSATION_STATES = Object.freeze({
-  IDLE: 'idle',
-  LISTENING: 'listening',
-  THINKING: 'thinking',
-  SPEAKING: 'speaking',
-  INTERRUPTED: 'interrupted',
-});
-
-/**
- * Đọc event stream từ POST /api/chat/stream. EventSource không hỗ trợ POST,
- * vì vậy client dùng fetch + ReadableStream và cùng cú pháp SSE chuẩn.
- */
-export async function consumeSseResponse(response, onEvent) {
-  if (!response.body || typeof response.body.getReader !== 'function') {
-    throw new Error('Streaming response không có readable body.');
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  const dispatchBlock = (block) => {
-    const lines = block.split('\n');
-    let event = 'message';
-    const dataLines = [];
-
-    for (const line of lines) {
-      if (line.startsWith('event:')) event = line.slice(6).trim();
-      if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
-    }
-
-    if (dataLines.length === 0) return;
-    try {
-      onEvent(event, JSON.parse(dataLines.join('\n')));
-    } catch {
-      throw new Error('Streaming response có dữ liệu không hợp lệ.');
-    }
-  };
-
-  while (true) {
-    const { value, done } = await reader.read();
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done }).replace(/\r/g, '');
-
-    let delimiterIndex = buffer.indexOf('\n\n');
-    while (delimiterIndex !== -1) {
-      const block = buffer.slice(0, delimiterIndex);
-      buffer = buffer.slice(delimiterIndex + 2);
-      if (block.trim()) dispatchBlock(block);
-      delimiterIndex = buffer.indexOf('\n\n');
-    }
-
-    if (done) break;
-  }
-
-  if (buffer.trim()) dispatchBlock(buffer);
-}
-
 // ============================================================================
 // REACT COMPONENT
 // ============================================================================
@@ -192,7 +124,7 @@ function App() {
   const [messages, setMessages] = useState(() => (storage ? loadStoredMessages(storage) : []));
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [conversationState, setConversationState] = useState(CONVERSATION_STATES.IDLE);
+  const [conversationState, dispatchConversation] = useReducer(conversationReducer, CONVERSATION_STATES.IDLE);
 
   const [theme, setTheme] = useState(() => (storage ? loadStoredTheme(storage) : 'light'));
   const [emotion, setEmotion] = useState('neutral');
@@ -207,6 +139,7 @@ function App() {
   const messageListRef = useRef(null);
   const recognitionRef = useRef(null);
   const streamAbortControllerRef = useRef(null);
+  const requestIdRef = useRef(0);
 
   // ---- Áp dụng theme lên <html data-theme="..."> + lưu localStorage ----
   useEffect(() => {
@@ -237,8 +170,10 @@ function App() {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'vi-VN';
       utterance.rate = 1.0;
-      utterance.onend = onEnd;
-      utterance.onerror = onEnd;
+      utterance.onend = () => onEnd?.();
+      utterance.onerror = (event) => {
+        if (event.error !== 'canceled' && event.error !== 'interrupted') onEnd?.();
+      };
       window.speechSynthesis.speak(utterance);
       return true;
     } catch (err) {
@@ -259,7 +194,7 @@ function App() {
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
-      setConversationState(CONVERSATION_STATES.IDLE);
+      dispatchConversation(CONVERSATION_EVENTS.LISTEN_END);
       return;
     }
 
@@ -275,17 +210,17 @@ function App() {
     recognition.onerror = (event) => {
       console.warn('[App] Lỗi SpeechRecognition:', event.error);
       setIsListening(false);
-      setConversationState(CONVERSATION_STATES.IDLE);
+      dispatchConversation(CONVERSATION_EVENTS.LISTEN_END);
     };
     recognition.onend = () => {
       setIsListening(false);
-      setConversationState(CONVERSATION_STATES.IDLE);
+      dispatchConversation(CONVERSATION_EVENTS.LISTEN_END);
     };
 
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
-    setConversationState(CONVERSATION_STATES.LISTENING);
+    dispatchConversation(CONVERSATION_EVENTS.LISTEN_START);
   }, [isListening]);
 
   // ---- Command handlers cho commandDispatcher ----
@@ -308,6 +243,9 @@ function App() {
   const sendMessage = useCallback(async (rawText) => {
     const text = rawText.trim();
     if (!text || isLoading) return;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    const isCurrentRequest = () => requestIdRef.current === requestId;
 
     const userMessage = createMessage('user', text);
     const streamingMessage = { ...createMessage('luna', ''), isStreaming: true };
@@ -315,7 +253,7 @@ function App() {
     setMessages((prev) => [...prev, streamingMessage]);
     setInputValue('');
     setIsLoading(true);
-    setConversationState(CONVERSATION_STATES.THINKING);
+    dispatchConversation(CONVERSATION_EVENTS.SEND);
 
     if (isSnakeSidebarTrigger(text)) {
       setActiveGame({ game: 'snake', id: `snake-local-${Date.now()}`, status: 'open' });
@@ -341,15 +279,16 @@ function App() {
 
       await consumeSseResponse(streamResponse, (event, payload) => {
         if (event === 'token' && typeof payload.token === 'string') {
+          if (!isCurrentRequest()) return;
           receivedToken = true;
-          setConversationState(CONVERSATION_STATES.SPEAKING);
+          dispatchConversation(CONVERSATION_EVENTS.TOKEN);
           setMessages((prev) => prev.map((message) => (
             message.id === streamingMessage.id
               ? { ...message, text: `${message.text}${payload.token}` }
               : message
           )));
         }
-        if (event === 'done' && payload.response) response = payload.response;
+        if (event === 'done' && payload.response && isCurrentRequest()) response = payload.response;
         if (event === 'error') throw new Error(payload.error || 'Streaming response thất bại.');
       });
 
@@ -373,6 +312,7 @@ function App() {
     }
 
     try {
+      if (!isCurrentRequest()) return;
       if (requestError) throw requestError;
       if (!response || typeof response.reply !== 'string') throw new Error('Không nhận được phản hồi hợp lệ từ Luna.');
       setMessages((prev) => prev.map((message) => (
@@ -387,34 +327,43 @@ function App() {
       dispatchCommands(response.commands, commandHandlers);
 
       if (response.voice) {
-        setConversationState(CONVERSATION_STATES.SPEAKING);
-        const speakingStarted = speak(response.reply, () => setConversationState(CONVERSATION_STATES.IDLE));
-        if (!speakingStarted) setConversationState(CONVERSATION_STATES.IDLE);
+        dispatchConversation(CONVERSATION_EVENTS.DONE_WITH_VOICE);
+        const speakingStarted = speak(response.reply, () => dispatchConversation(CONVERSATION_EVENTS.TTS_ENDED));
+        if (!speakingStarted) dispatchConversation(CONVERSATION_EVENTS.DONE_NO_VOICE);
       } else {
-        setConversationState(CONVERSATION_STATES.IDLE);
+        dispatchConversation(CONVERSATION_EVENTS.DONE_NO_VOICE);
       }
     } catch (err) {
+      if (!isCurrentRequest()) return;
       console.error('[App] Lỗi gửi tin nhắn:', err.message);
       const errorText = err.name === 'AbortError'
         ? 'Phản hồi của Luna đã được ngắt.'
         : 'Luna không kết nối được với server, thử lại giúp Luna nha 🥲';
       setMessages((prev) => prev.map((message) => (
         message.id === streamingMessage.id
-          ? { ...message, text: errorText, isStreaming: false }
+          ? { ...message, text: message.text || errorText, isStreaming: false }
           : message
       )));
-      setEmotion('sad');
-      setAnimation('idle');
-      setConversationState(err.name === 'AbortError' ? CONVERSATION_STATES.INTERRUPTED : CONVERSATION_STATES.IDLE);
+      if (err.name !== 'AbortError') {
+        setEmotion('sad');
+        setAnimation('idle');
+        dispatchConversation(CONVERSATION_EVENTS.ERROR);
+      }
     } finally {
-      setIsLoading(false);
+      if (isCurrentRequest()) setIsLoading(false);
     }
   }, [isLoading, sessionId, speak]);
 
   const interruptConversation = useCallback(() => {
+    requestIdRef.current += 1;
     streamAbortControllerRef.current?.abort();
     if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
-    setConversationState(CONVERSATION_STATES.INTERRUPTED);
+    setMessages((prev) => prev.map((message) => (
+      message.isStreaming
+        ? { ...message, text: message.text || 'Phản hồi của Luna đã được ngắt.', isStreaming: false }
+        : message
+    )));
+    dispatchConversation(CONVERSATION_EVENTS.INTERRUPT);
     setIsLoading(false);
   }, []);
 
@@ -432,20 +381,8 @@ function App() {
 
   const closeGame = () => setActiveGame(null);
   const closePlan = () => setPlan(null);
-  const avatarAnimation = conversationState === CONVERSATION_STATES.LISTENING || conversationState === CONVERSATION_STATES.THINKING
-    ? 'thinking'
-    : conversationState === CONVERSATION_STATES.SPEAKING
-      ? 'talk'
-      : conversationState === CONVERSATION_STATES.INTERRUPTED
-        ? 'idle'
-        : animation;
-  const conversationStatus = {
-    [CONVERSATION_STATES.IDLE]: 'Sẵn sàng trò chuyện',
-    [CONVERSATION_STATES.LISTENING]: 'Đang lắng nghe...',
-    [CONVERSATION_STATES.THINKING]: 'Đang suy nghĩ...',
-    [CONVERSATION_STATES.SPEAKING]: 'Luna đang trả lời...',
-    [CONVERSATION_STATES.INTERRUPTED]: 'Đã ngắt phản hồi',
-  }[conversationState];
+  const avatarAnimation = getAvatarAnimation(conversationState, animation);
+  const conversationStatus = getConversationStatusText(conversationState);
 
   return (
     <div className="app-shell">

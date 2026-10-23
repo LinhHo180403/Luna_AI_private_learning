@@ -40,3 +40,20 @@ test('Nara stream forwards ordered token chunks without a network request', asyn
   assert.equal(request.url, 'https://nara.test/v1/chat/completions');
   assert.equal(JSON.parse(request.options.body).stream, true);
 });
+
+test('Nara stream stops immediately when an external abort signal is triggered', async () => {
+  const controller = new AbortController();
+  const pendingFetch = (_url, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener('abort', () => {
+      const error = new Error('aborted');
+      error.name = 'AbortError';
+      reject(error);
+    }, { once: true });
+  });
+  const pending = callNaraStream({
+    messages: [{ role: 'user', content: 'hello' }], onToken: () => {}, apiKey: 'test-key',
+    fetchImpl: pendingFetch, signal: controller.signal, timeoutMs: 10_000,
+  });
+  controller.abort();
+  await assert.rejects(pending, (error) => error.name === 'AbortError');
+});
